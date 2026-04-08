@@ -57,7 +57,7 @@ public sealed partial class ContextStaticEcs
 
 				RadixSort.SortWithIndirection(keys.AsSpan(0, count), indirection.AsSpan(0, count), count);
 				// CreateAttacks
-				W.Query<None<SpawnTag, DeadTag>>().WriteBlock<UnitComponent>().Read<PositionComponent, DamageComponent, DataComponent>().For(this);
+				W.Query<None<SpawnTag, DeadTag>>().WriteBlock<UnitComponent>().Read<PositionComponent, DamageComponent, DataComponent>().For(ref this);
 			}
 			finally
 			{
@@ -85,7 +85,6 @@ public sealed partial class ContextStaticEcs
 		{
 			for (uint i = 0; i < count; i++)
 			{
-				var damage = damages[i];
 				if (damages[i].Value.Cooldown <= 0 || (data[i].Value.Tick - units[i].Value.SpawnTick) % damage.Value.Cooldown != 0)
 					continue;
 
@@ -99,7 +98,7 @@ public sealed partial class ContextStaticEcs
 						Value = new Attack<EntityGID>
 						{
 							Target = target.Entity,
-							Damage = damage.Value.Attack,
+							Damage = damages[i].Value.Attack,
 							Ticks  = Common.AttackTicks(positions[i].Value.V, target.Position.V),
 						},
 					});
