@@ -6,19 +6,18 @@ using Benchmark.Core.Algorithms;
 using Benchmark.Core.Components;
 using Benchmark.Core.Random;
 using FFS.Libraries.StaticEcs;
-using static System.Runtime.CompilerServices.MethodImplOptions;
 
 namespace Benchmark.StaticEcs
 {
 
 public sealed partial class ContextStaticEcs
 {
-	private struct AttackSystem : ISystem,
-										   W.IQueryBlock.Read<UnitComponent, PositionComponent>,
-										   W.IQueryBlock.Write<UnitComponent>.Read<PositionComponent, DamageComponent, DataComponent>
+	private struct AttackSystem
+		: ISystem, World<StaticWorld>.IQueryBlock.Read<UnitComponent, PositionComponent>,
+		  World<StaticWorld>.IQueryBlock.Write<UnitComponent>.Read<PositionComponent, DamageComponent, DataComponent>
 	{
-		private          State     _state;
-		private readonly int       _capacity;
+		private          State _state;
+		private readonly int   _capacity;
 
 		private struct State
 		{
@@ -50,14 +49,19 @@ public sealed partial class ContextStaticEcs
 				};
 
 				// FillTargets
-				W.Query<None<SpawnTag, DeadTag>>().ReadBlock<UnitComponent, PositionComponent>().For(ref this);
+				W.Query<None<SpawnTag, DeadTag>>()
+				 .ReadBlock<UnitComponent, PositionComponent>()
+				 .For(ref this);
 				var count = _state.Count;
 				if (count <= 0)
 					return;
 
 				RadixSort.SortWithIndirection(keys.AsSpan(0, count), indirection.AsSpan(0, count), count);
 				// CreateAttacks
-				W.Query<None<SpawnTag, DeadTag>>().WriteBlock<UnitComponent>().Read<PositionComponent, DamageComponent, DataComponent>().For(ref this);
+				W.Query<None<SpawnTag, DeadTag>>()
+				 .WriteBlock<UnitComponent>()
+				 .Read<PositionComponent, DamageComponent, DataComponent>()
+				 .For(ref this);
 			}
 			finally
 			{
@@ -67,8 +71,14 @@ public sealed partial class ContextStaticEcs
 			}
 		}
 
-		[MethodImpl(AggressiveInlining)]
-		public void Invoke(uint count, W.EntityBlock entities, BlockR<UnitComponent> units, BlockR<PositionComponent> positions)
+#if ECS_BENCHMARK_FORCE_INLINING
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+#endif
+		public void Invoke(
+			uint count,
+			World<StaticWorld>.EntityBlock entities,
+			BlockR<UnitComponent> units,
+			BlockR<PositionComponent> positions)
 		{
 			for (uint i = 0; i < count; i++)
 			{
@@ -78,30 +88,39 @@ public sealed partial class ContextStaticEcs
 			}
 		}
 
-		[MethodImpl(AggressiveInlining)]
-		public void Invoke(uint count, W.EntityBlock entities,
-						   Block<UnitComponent> units, BlockR<PositionComponent> positions,
-						   BlockR<DamageComponent> damages, BlockR<DataComponent> data)
+#if ECS_BENCHMARK_FORCE_INLINING
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+#endif
+		public void Invoke(
+			uint count,
+			World<StaticWorld>.EntityBlock entities,
+			Block<UnitComponent> units,
+			BlockR<PositionComponent> positions,
+			BlockR<DamageComponent> damages,
+			BlockR<DataComponent> data)
 		{
 			for (uint i = 0; i < count; i++)
 			{
-				if (damages[i].Value.Cooldown <= 0 || (data[i].Value.Tick - units[i].Value.SpawnTick) % damages[i].Value.Cooldown != 0)
+				var damage = damages[i];
+				if (damages[i].Value.Cooldown                                               <= 0
+				 || (data[i].Value.Tick - units[i].Value.SpawnTick) % damage.Value.Cooldown != 0)
 					continue;
 
 				var generator = new RandomGenerator(units[i].Value.Seed);
 				var index     = generator.Random(ref units[i].Value.Counter, _state.Count);
 				var target    = _state.Targets[_state.Indirection[index]];
 
-				W.NewEntity<EventEntity>().Set(
-					new AttackComponent
-					{
-						Value = new Attack<EntityGID>
-						{
-							Target = target.Entity,
-							Damage = damages[i].Value.Attack,
-							Ticks  = Common.AttackTicks(positions[i].Value.V, target.Position.V),
-						},
-					});
+				W.NewEntity<EventEntity>()
+				 .Set(
+					  new AttackComponent
+					  {
+						  Value = new Attack<EntityGID>
+						  {
+							  Target = target.Entity,
+							  Damage = damage.Value.Attack,
+							  Ticks  = Common.AttackTicks(positions[i].Value.V, target.Position.V),
+						  },
+					  });
 			}
 		}
 	}

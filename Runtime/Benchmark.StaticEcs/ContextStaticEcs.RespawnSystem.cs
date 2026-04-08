@@ -1,4 +1,3 @@
-using System;
 using System.Runtime.CompilerServices;
 using Benchmark.Core.Components;
 using Benchmark.Core.Hash;
@@ -9,16 +8,22 @@ namespace Benchmark.StaticEcs
 
 public sealed partial class ContextStaticEcs
 {
-	private struct RespawnSystem : ISystem, W.IQueryBlock.Read<UnitComponent, DataComponent>
+	private struct RespawnSystem
+		: ISystem, World<StaticWorld>.IQueryBlock.Read<UnitComponent, DataComponent>
 	{
-		public void Update()
-		{
-			W.Query<All<DeadTag>>().ReadBlock<UnitComponent, DataComponent>().For(ref this);
-		}
+		public void Update() =>
+			W.Query<All<DeadTag>>()
+			 .ReadBlock<UnitComponent, DataComponent>()
+			 .For(ref this);
 
+#if ECS_BENCHMARK_FORCE_INLINING
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public void Invoke(uint count, World<StaticWorld>.EntityBlock entities, BlockR<UnitComponent> unit,
-						   BlockR<DataComponent> data)
+#endif
+		public void Invoke(
+			uint count,
+			World<StaticWorld>.EntityBlock entities,
+			BlockR<UnitComponent> unit,
+			BlockR<DataComponent> data)
 		{
 			for (uint i = 0; i < count; i++)
 			{
@@ -32,13 +37,16 @@ public sealed partial class ContextStaticEcs
 									  {
 										  Value = new Unit
 										  {
-											  Id   = unit[i].Value.Id | (uint)data[i].Value.Tick << 16,
-											  Seed = StableHash32.Hash(unit[i].Value.Seed, unit[i].Value.Counter),
+											  Id = unit[i].Value.Id | (uint)data[i].Value.Tick << 16,
+											  Seed = StableHash32.Hash(
+												  unit[i].Value.Seed,
+												  unit[i].Value.Counter),
 										  },
 									  });
 				newEntity.Set<SpawnTag>();
 
-				entities[i].Destroy();
+				entities[i]
+				   .Destroy();
 			}
 		}
 	}
