@@ -1,5 +1,4 @@
 using System;
-using System.Runtime.CompilerServices;
 using Benchmark.Core.Components;
 using FFS.Libraries.StaticEcs;
 
@@ -13,8 +12,8 @@ internal abstract class Systems : World<StaticWorld>.Systems<StaticSystems> { }
 
 public sealed partial class ContextStaticEcs
 {
-	internal struct EventEntity : IEntityType {}
-	internal struct UnitEntity : IEntityType {}
+	internal struct EventEntity : IEntityType { }
+	internal struct UnitEntity : IEntityType { }
 
 	private struct DataComponent : IComponent
 	{
@@ -61,7 +60,8 @@ public sealed partial class ContextStaticEcs
 		 && Value.Ticks  == other.Value.Ticks
 		 && Value.Target == other.Value.Target;
 
-		public override int GetHashCode() => HashCode.Combine(Value.Target, Value.Damage, Value.Ticks);
+		public override int GetHashCode() =>
+			HashCode.Combine(Value.Target, Value.Damage, Value.Ticks);
 	}
 
 	private struct SpawnTag : ITag { }

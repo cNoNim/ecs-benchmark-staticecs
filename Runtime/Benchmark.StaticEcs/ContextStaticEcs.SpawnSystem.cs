@@ -2,23 +2,29 @@ using System;
 using System.Runtime.CompilerServices;
 using Benchmark.Core.Components;
 using FFS.Libraries.StaticEcs;
-using static System.Runtime.CompilerServices.MethodImplOptions;
 
 namespace Benchmark.StaticEcs
 {
 
 public sealed partial class ContextStaticEcs
 {
-	private struct SpawnSystem : ISystem, W.IQueryBlock.Write<UnitComponent>.Read<DataComponent>
+	private struct SpawnSystem
+		: ISystem, World<StaticWorld>.IQueryBlock.Write<UnitComponent>.Read<DataComponent>
 	{
 		public void Update() =>
 			W.Query<All<SpawnTag>>()
 			 .WriteBlock<UnitComponent>()
-			 .Read<DataComponent>().For(ref this);
+			 .Read<DataComponent>()
+			 .For(ref this);
 
-		[MethodImpl(AggressiveInlining)]
-		public void Invoke(uint count, W.EntityBlock entities, Block<UnitComponent> unit,
-						   BlockR<DataComponent> data)
+#if ECS_BENCHMARK_FORCE_INLINING
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+#endif
+		public void Invoke(
+			uint count,
+			World<StaticWorld>.EntityBlock entities,
+			Block<UnitComponent> unit,
+			BlockR<DataComponent> data)
 		{
 			for (uint i = 0; i < count; i++)
 			{
