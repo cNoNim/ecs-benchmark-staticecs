@@ -85,7 +85,7 @@ public sealed partial class ContextStaticEcs
 		{
 			for (uint i = 0; i < count; i++)
 			{
-				if (damages[i].Value.Cooldown <= 0 || (data[i].Value.Tick - units[i].Value.SpawnTick) % damage.Value.Cooldown != 0)
+				if (damages[i].Value.Cooldown <= 0 || (data[i].Value.Tick - units[i].Value.SpawnTick) % damages[i].Value.Cooldown != 0)
 					continue;
 
 				var generator = new RandomGenerator(units[i].Value.Seed);
