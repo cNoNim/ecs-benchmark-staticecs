@@ -14,14 +14,16 @@ public sealed partial class ContextStaticEcs : ContextBase
 	{
 		W.Create(WorldConfig.Default());
 		W.Types()
-		 .Component<DataComponent>()
-		 .Component<UnitComponent>()
-		 .Component<HealthComponent>()
-		 .Component<DamageComponent>()
-		 .Component<SpriteComponent>()
-		 .Component<PositionComponent>()
-		 .Component<VelocityComponent>()
-		 .Component<AttackComponent>()
+		 .EntityType<UnitEntity>(1)
+		 .EntityType<EventEntity>(2)
+		 .Component<DataComponent>(config: new (noDataLifecycle: true))
+		 .Component<UnitComponent>(config: new (noDataLifecycle: true))
+		 .Component<HealthComponent>(config: new (noDataLifecycle: true))
+		 .Component<DamageComponent>(config: new (noDataLifecycle: true))
+		 .Component<SpriteComponent>(config: new (noDataLifecycle: true))
+		 .Component<PositionComponent>(config: new (noDataLifecycle: true))
+		 .Component<VelocityComponent>(config: new (noDataLifecycle: true))
+		 .Component<AttackComponent>(config: new (noDataLifecycle: true))
 		 .Tag<SpawnTag>()
 		 .Tag<DeadTag>()
 		 .Tag<UnitNpcTag>()
@@ -48,7 +50,7 @@ public sealed partial class ContextStaticEcs : ContextBase
 
 		for (var i = 0; i < EntityCount; i++)
 		{
-			var entity = W.NewEntity<Default>()
+			var entity = W.NewEntity<UnitEntity>()
 						  .Set(
 							   new DataComponent(),
 							   new UnitComponent
