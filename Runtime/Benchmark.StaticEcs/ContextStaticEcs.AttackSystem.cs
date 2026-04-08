@@ -1,35 +1,38 @@
 using System;
 using System.Buffers;
+using System.Runtime.CompilerServices;
 using Benchmark.Core;
 using Benchmark.Core.Algorithms;
 using Benchmark.Core.Components;
 using Benchmark.Core.Random;
 using FFS.Libraries.StaticEcs;
+using static System.Runtime.CompilerServices.MethodImplOptions;
 
 namespace Benchmark.StaticEcs
 {
 
 public sealed partial class ContextStaticEcs
 {
-	private readonly struct AttackSystem : ISystem
+	private struct AttackSystem : ISystem,
+										   W.IQueryBlock.Read<UnitComponent, PositionComponent>,
+										   W.IQueryBlock.Write<UnitComponent>.Read<PositionComponent, DamageComponent, DataComponent>
 	{
-		private readonly int _capacity;
+		private          State     _state;
+		private readonly int       _capacity;
 
-		private struct FillState
+		private struct State
 		{
 			public uint[]   Keys;
 			public Target[] Targets;
-			public int      Count;
-		}
-
-		private struct CreateState
-		{
-			public int      Count;
 			public int[]    Indirection;
-			public Target[] Targets;
+			public int      Count;
 		}
 
-		public AttackSystem(int capacity) => _capacity = capacity;
+		public AttackSystem(int capacity)
+		{
+			_state    = default;
+			_capacity = capacity;
+		}
 
 		public void Update()
 		{
@@ -38,12 +41,23 @@ public sealed partial class ContextStaticEcs
 			var targets     = ArrayPool<Target>.Shared.Rent(_capacity);
 			try
 			{
-				var count = FillTargets(keys, targets);
+				_state = new State
+				{
+					Keys        = keys,
+					Targets     = targets,
+					Indirection = indirection,
+					Count       = 0,
+				};
+
+				// FillTargets
+				W.Query<None<SpawnTag, DeadTag>>().ReadBlock<UnitComponent, PositionComponent>().For(ref this);
+				var count = _state.Count;
 				if (count <= 0)
 					return;
 
 				RadixSort.SortWithIndirection(keys.AsSpan(0, count), indirection.AsSpan(0, count), count);
-				CreateAttacks(count, indirection, targets);
+				// CreateAttacks
+				W.Query<None<SpawnTag, DeadTag>>().WriteBlock<UnitComponent>().Read<PositionComponent, DamageComponent, DataComponent>().For(this);
 			}
 			finally
 			{
@@ -53,67 +67,43 @@ public sealed partial class ContextStaticEcs
 			}
 		}
 
-		private static int FillTargets(uint[] keys, Target[] targets)
+		[MethodImpl(AggressiveInlining)]
+		public void Invoke(uint count, W.EntityBlock entities, BlockR<UnitComponent> units, BlockR<PositionComponent> positions)
 		{
-			var fill = new FillState
+			for (uint i = 0; i < count; i++)
 			{
-				Keys    = keys,
-				Targets = targets,
-				Count   = 0,
-			};
-			W.Query<None<SpawnTag, DeadTag>>().For(
-				ref fill,
-				static (ref FillState state, World<StaticWorld>.Entity entity, in UnitComponent unit,
-						in PositionComponent position) =>
-				{
-					state.Keys[state.Count]    = unit.Value.Id;
-					state.Targets[state.Count] = new Target(entity.GID, position.Value);
-					state.Count++;
-				});
-
-			return fill.Count;
+				_state.Keys[_state.Count]    = units[i].Value.Id;
+				_state.Targets[_state.Count] = new Target(entities[i].GID, positions[i].Value);
+				_state.Count++;
+			}
 		}
 
-		private static void CreateAttacks(int count, int[] indirection, Target[] targets)
+		[MethodImpl(AggressiveInlining)]
+		public void Invoke(uint count, W.EntityBlock entities,
+						   Block<UnitComponent> units, BlockR<PositionComponent> positions,
+						   BlockR<DamageComponent> damages, BlockR<DataComponent> data)
 		{
-			var create = new CreateState
+			for (uint i = 0; i < count; i++)
 			{
-				Count       = count,
-				Indirection = indirection,
-				Targets     = targets,
-			};
-			W.Query<None<SpawnTag, DeadTag>>().For(
-				ref create,
-				static (ref CreateState state, ref UnitComponent unit, in PositionComponent position,
-						in DamageComponent damage, in DataComponent data) =>
-				{
-					if (damage.Value.Cooldown <= 0)
-						return;
+				var damage = damages[i];
+				if (damages[i].Value.Cooldown <= 0 || (data[i].Value.Tick - units[i].Value.SpawnTick) % damage.Value.Cooldown != 0)
+					continue;
 
-					var tick = data.Value.Tick - unit.Value.SpawnTick;
-					if (tick % damage.Value.Cooldown != 0)
-						return;
+				var generator = new RandomGenerator(units[i].Value.Seed);
+				var index     = generator.Random(ref units[i].Value.Counter, _state.Count);
+				var target    = _state.Targets[_state.Indirection[index]];
 
-					var generator = new RandomGenerator(unit.Value.Seed);
-					var index     = generator.Random(ref unit.Value.Counter, state.Count);
-					var target    = state.Targets[state.Indirection[index]];
-
-					CreateAttack(target, position.Value, damage.Value.Attack);
-				});
-		}
-
-		private static void CreateAttack(in Target target, in Position position, int damage)
-		{
-			W.NewEntity<Default>().Set(
-				new AttackComponent
-				{
-					Value = new Attack<EntityGID>
+				W.NewEntity<EventEntity>().Set(
+					new AttackComponent
 					{
-						Target = target.Entity,
-						Damage = damage,
-						Ticks  = Common.AttackTicks(position.V, target.Position.V),
-					},
-				});
+						Value = new Attack<EntityGID>
+						{
+							Target = target.Entity,
+							Damage = damage.Value.Attack,
+							Ticks  = Common.AttackTicks(positions[i].Value.V, target.Position.V),
+						},
+					});
+			}
 		}
 	}
 }
