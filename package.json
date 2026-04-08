@@ -1,0 +1,21 @@
+{
+  "name": "ecs.benchmark.staticecs",
+  "author": {
+    "name": "cNoNim",
+    "url": "https://github.com/cNoNim"
+  },
+  "displayName": "ECS Benchmark StaticEcs",
+  "description": "ECS Benchmark StaticEcs",
+  "unity": "2020.3",
+  "version": "1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cNoNim/ecs-benchmark-staticecs.git"
+  },
+  "dependencies": {},
+  "keywords": [
+    "ecs",
+    "benchmark",
+    "static-ecs"
+  ]
+}
